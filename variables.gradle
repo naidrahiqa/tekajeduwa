@@ -1,0 +1,9 @@
+ext {
+    minSdkVersion = 24
+    compileSdkVersion = 36
+    targetSdkVersion = 36
+    androidxActivityVersion = '1.11.0'
+    androidxCoreVersion = '1.17.0'
+    composeBomVersion = '2025.06.00'
+    junitVersion = '4.13.2'
+}
