@@ -1,32 +1,54 @@
 package com.tekajeduwa.app
 
+import android.content.SharedPreferences
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.dynamicDarkColorScheme
+import androidx.compose.material3.dynamicLightColorScheme
+import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -35,41 +57,54 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-val Bg = Color(0xFF0F172A)
-val Card = Color(0xFF111C31)
-val Border = Color(0xFF334155)
-val Indigo = Color(0xFF6366F1)
-val IndigoDark = Color(0xFF4F46E5)
-val Green = Color(0xFF059669)
-val Red = Color(0xFFB91C1C)
-val Slate = Color(0xFF94A3B8)
-val TextMain = Color(0xFFE2E8F0)
+// Fallback buat HP di bawah Android 12: hijau khas app sekolah
+private val LightGreenScheme = lightColorScheme(
+    primary = androidx.compose.ui.graphics.Color(0xFF2E6B34),
+    secondary = androidx.compose.ui.graphics.Color(0xFF52634F),
+    tertiary = androidx.compose.ui.graphics.Color(0xFF38656A),
+)
+
+private val DarkGreenScheme = darkColorScheme(
+    primary = androidx.compose.ui.graphics.Color(0xFFA2D391),
+    secondary = androidx.compose.ui.graphics.Color(0xFFB8CCB4),
+    tertiary = androidx.compose.ui.graphics.Color(0xFFA2CED4),
+)
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
         val prefs = getSharedPreferences("tekajeduwa", MODE_PRIVATE)
         setContent {
-            MaterialTheme(colorScheme = MaterialTheme.colorScheme.copy(background = Bg)) {
+            val dark = isSystemInDarkTheme()
+            val context = LocalContext.current
+            val scheme = when {
+                Build.VERSION.SDK_INT >= Build.VERSION_CODES.S ->
+                    if (dark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+                dark -> DarkGreenScheme
+                else -> LightGreenScheme
+            }
+            MaterialTheme(colorScheme = scheme) {
                 App(prefs)
             }
         }
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun App(prefs: android.content.SharedPreferences) {
+fun App(prefs: SharedPreferences) {
     var seats by remember { mutableStateOf(loadSeats(prefs)) }
     var period by remember { mutableStateOf(prefs.getInt("period", 0)) }
     var editTarget by remember { mutableStateOf<Pair<Int, Int>?>(null) }
     var showBulk by remember { mutableStateOf(false) }
+    var showResetConfirm by remember { mutableStateOf(false) }
 
     fun simpan(s: Seats, p: Int = period) {
         seats = s
@@ -77,133 +112,149 @@ fun App(prefs: android.content.SharedPreferences) {
         saveSeats(prefs, s, p)
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Bg)
-            .verticalScroll(rememberScrollState())
-            .padding(16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text("Tekajeduwa", color = Indigo, fontSize = 26.sp, fontWeight = FontWeight.Bold)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                StatBox(period.toString(), "Periode")
-                StatBox(seats.flatten().filterNotNull().size.toString(), "Siswa")
-            }
-        }
-
-        Spacer(Modifier.height(14.dp))
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(Color(0xFF16223A), RoundedCornerShape(10.dp))
-                .border(1.dp, Border, RoundedCornerShape(10.dp))
-                .padding(vertical = 10.dp),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(
-                "PAPAN TULIS / DEPAN KELAS",
-                color = Slate,
-                fontSize = 11.sp,
-                letterSpacing = 2.sp,
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Tekajeduwa") },
+                actions = {
+                    IconButton(onClick = { showBulk = true }) {
+                        Icon(Icons.Filled.Edit, contentDescription = "Isi nama cepat")
+                    }
+                    IconButton(onClick = { showResetConfirm = true }) {
+                        Icon(Icons.Filled.Refresh, contentDescription = "Reset")
+                    }
+                },
             )
-        }
-        Spacer(Modifier.height(12.dp))
-
-        // label arah tiap barisan
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Spacer(Modifier.width(30.dp))
-            COLUMN_SIZES.indices.forEach { c ->
-                val ganjil = (c + 1) % 2 == 1
-                Text(
-                    "B${c + 1} ${if (ganjil) "↗" else "↖"}",
-                    color = if (ganjil) Color(0xFFA5B4FC) else Color(0xFF6EE7B7),
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.weight(1f),
-                )
-            }
-        }
-        Spacer(Modifier.height(8.dp))
-
-        // grid kursi: baris = kedalaman meja, kolom = barisan
-        for (d in 0 until MAX_DEPTH) {
+        },
+        bottomBar = {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(vertical = 5.dp),
-                verticalAlignment = Alignment.CenterVertically,
+                    .windowInsetsPadding(WindowInsets.navigationBars)
+                    .padding(horizontal = 16.dp, vertical = 10.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                Text(
-                    "${d + 1}",
-                    color = Slate,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.width(30.dp),
+                Button(
+                    onClick = { simpan(rollSeats(seats, period % 2 == 1), period + 1) },
+                    modifier = Modifier.weight(1.4f).height(48.dp),
+                    shape = RoundedCornerShape(14.dp),
+                ) { Text("Rolling Periode") }
+
+                FilledTonalButton(
+                    onClick = { simpan(shuffleSeats(seats)) },
+                    modifier = Modifier.weight(1f).height(48.dp),
+                    shape = RoundedCornerShape(14.dp),
+                ) { Text("Acak") }
+            }
+        },
+    ) { inner ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(inner)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            // Ringkasan
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                StatCard(
+                    nilai = period.toString(),
+                    label = "Periode",
+                    modifier = Modifier.weight(1f),
                 )
-                seats.forEachIndexed { c, col ->
-                    Box(modifier = Modifier.weight(1f).padding(horizontal = 3.dp)) {
-                        if (d < col.size) {
-                            SeatCell(
-                                siswa = col[d],
-                                onClick = { editTarget = c to d },
+                StatCard(
+                    nilai = seats.flatten().filterNotNull().size.toString(),
+                    label = "Siswa",
+                    modifier = Modifier.weight(1f),
+                )
+            }
+
+            Spacer(Modifier.height(14.dp))
+
+            // Papan tempat duduk sebagai satu kartu besar
+            Card(
+                shape = RoundedCornerShape(24.dp),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Column(Modifier.padding(14.dp)) {
+                    Text(
+                        "DEPAN KELAS",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+
+                    Spacer(Modifier.height(8.dp))
+
+                    // Header barisan
+                    Row(modifier = Modifier.fillMaxWidth()) {
+                        Spacer(Modifier.width(22.dp))
+                        COLUMN_SIZES.indices.forEach { c ->
+                            Text(
+                                "B${c + 1}",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.weight(1f),
                             )
+                        }
+                    }
+
+                    Spacer(Modifier.height(8.dp))
+
+                    // Grid kursi
+                    for (d in 0 until MAX_DEPTH) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 3.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                "${d + 1}",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.width(22.dp),
+                            )
+                            seats.forEachIndexed { c, col ->
+                                Box(Modifier.weight(1f).padding(horizontal = 3.dp)) {
+                                    if (d < col.size) {
+                                        SeatCell(siswa = col[d], onClick = { editTarget = c to d })
+                                    }
+                                }
+                            }
                         }
                     }
                 }
             }
-        }
 
-        Spacer(Modifier.height(18.dp))
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(
-                onClick = { simpan(rollSeats(seats), period + 1) },
-                colors = ButtonDefaults.buttonColors(containerColor = IndigoDark),
-                modifier = Modifier.weight(2f),
-            ) { Text("▶ Rolling", color = Color.White) }
-            Button(
-                onClick = { simpan(shuffleSeats(seats)) },
-                colors = ButtonDefaults.buttonColors(containerColor = Green),
-                modifier = Modifier.weight(2f),
-            ) { Text("🎲 Acak", color = Color.White) }
-            Button(
-                onClick = { simpan(emptySeats(), 0) },
-                colors = ButtonDefaults.buttonColors(containerColor = Red),
-                modifier = Modifier.weight(1f),
-            ) { Text("⟲", color = Color.White) }
+            Spacer(Modifier.height(10.dp))
+            Text(
+                "Ketuk kursi untuk mengisi nama. Tiap periode semua maju dengan " +
+                    "nyerong: arah kanan-kiri bergantian tiap periode supaya " +
+                    "semua siswa keliling seluruh barisan. Paling depan pindah " +
+                    "ke paling belakang.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(horizontal = 6.dp),
+            )
+            Spacer(Modifier.height(16.dp))
         }
-        Spacer(Modifier.height(10.dp))
-        Button(
-            onClick = { showBulk = true },
-            colors = ButtonDefaults.buttonColors(containerColor = Card),
-            modifier = Modifier.fillMaxWidth(),
-        ) { Text("+ Isi Nama Cepat", color = TextMain) }
-
-        Spacer(Modifier.height(16.dp))
-        Text(
-            "Baris ganjil nyerong kanan, genap nyerong kiri. Paling depan pindah ke paling belakang.",
-            color = Slate,
-            fontSize = 12.sp,
-            textAlign = TextAlign.Center,
-        )
     }
 
-    // dialog edit satu kursi
+    // Dialog edit satu kursi
     editTarget?.let { (c, d) ->
         var draft by remember(c to d) { mutableStateOf(seats[c][d]?.nama ?: "") }
         AlertDialog(
             onDismissRequest = { editTarget = null },
-            title = { Text("Barisan ${c + 1} · Meja ${d + 1}") },
+            title = { Text("Barisan ${c + 1}, Meja ${d + 1}") },
             text = {
                 OutlinedTextField(
                     value = draft,
@@ -214,42 +265,41 @@ fun App(prefs: android.content.SharedPreferences) {
                 )
             },
             confirmButton = {
-                Button(onClick = {
-                    val nama = draft.trim()
-                    val baru = seats.mapIndexed { ci, col ->
-                        col.mapIndexed { di, s ->
-                            when {
-                                ci == c && di == d && nama.isNotEmpty() -> Siswa(newId(), nama)
-                                ci == c && di == d -> null
-                                else -> s
-                            }
-                        }
-                    }
-                    simpan(baru)
-                    editTarget = null
-                }) { Text("Simpan") }
+                Button(
+                    onClick = {
+                        val nama = draft.trim()
+                        simpan(
+                            seats.mapIndexed { ci, col ->
+                                col.mapIndexed { di, s ->
+                                    when {
+                                        ci == c && di == d && nama.isNotEmpty() -> Siswa(newId(), nama)
+                                        ci == c && di == d -> null
+                                        else -> s
+                                    }
+                                }
+                            },
+                        )
+                        editTarget = null
+                    },
+                ) { Text("Simpan") }
             },
             dismissButton = {
                 Row {
-                    Button(onClick = {
+                    TextButton(onClick = {
                         simpan(
                             seats.mapIndexed { ci, col ->
                                 col.mapIndexed { di, s -> if (ci == c && di == d) null else s }
                             },
                         )
                         editTarget = null
-                    }, colors = ButtonDefaults.buttonColors(containerColor = Red)) { Text("Hapus") }
-                    Spacer(Modifier.width(6.dp))
-                    Button(onClick = { editTarget = null }, colors = ButtonDefaults.buttonColors(containerColor = Card)) { Text("Batal") }
+                    }) { Text("Hapus") }
+                    TextButton(onClick = { editTarget = null }) { Text("Batal") }
                 }
             },
-            containerColor = Card,
-            textContentColor = TextMain,
-            titleContentColor = TextMain,
         )
     }
 
-    // dialog isi nama cepat
+    // Dialog isi nama cepat
     if (showBulk) {
         BulkDialog(
             onDismiss = { showBulk = false },
@@ -259,36 +309,57 @@ fun App(prefs: android.content.SharedPreferences) {
             },
         )
     }
+
+    // Konfirmasi reset
+    if (showResetConfirm) {
+        AlertDialog(
+            onDismissRequest = { showResetConfirm = false },
+            title = { Text("Reset semua?") },
+            text = { Text("Semua nama siswa dan hitungan periode akan dihapus.") },
+            confirmButton = {
+                Button(onClick = {
+                    simpan(emptySeats(), 0)
+                    showResetConfirm = false
+                }) { Text("Reset") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showResetConfirm = false }) { Text("Batal") }
+            },
+        )
+    }
 }
 
 @Composable
-fun StatBox(angka: String, ket: String) {
-    Column(
-        modifier = Modifier
-            .background(Card, RoundedCornerShape(10.dp))
-            .border(1.dp, Border, RoundedCornerShape(10.dp))
-            .padding(horizontal = 14.dp, vertical = 6.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Text(angka, color = Color(0xFFA5B4FC), fontWeight = FontWeight.Bold, fontSize = 18.sp)
-        Text(ket, color = Slate, fontSize = 10.sp)
+fun StatCard(nilai: String, label: String, modifier: Modifier = Modifier) {
+    Card(modifier = modifier, shape = RoundedCornerShape(16.dp)) {
+        Column(Modifier.padding(horizontal = 16.dp, vertical = 10.dp)) {
+            Text(nilai, style = MaterialTheme.typography.headlineSmall)
+            Text(
+                label,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
 }
 
 @Composable
 fun SeatCell(siswa: Siswa?, onClick: () -> Unit) {
+    val shape = RoundedCornerShape(12.dp)
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .aspectRatio(1.15f)
+            .aspectRatio(1f)
             .then(
                 if (siswa != null) {
                     Modifier
-                        .background(Color(0xFF1E1B4B), RoundedCornerShape(9.dp))
-                        .border(1.5.dp, Indigo, RoundedCornerShape(9.dp))
+                        .background(
+                            MaterialTheme.colorScheme.secondaryContainer,
+                            shape,
+                        )
                 } else {
                     Modifier
-                        .border(1.5.dp, Border, RoundedCornerShape(9.dp))
+                        .background(MaterialTheme.colorScheme.surfaceContainerHigh, shape)
                 },
             )
             .clickable(onClick = onClick)
@@ -298,15 +369,18 @@ fun SeatCell(siswa: Siswa?, onClick: () -> Unit) {
         if (siswa != null) {
             Text(
                 siswa.nama,
-                color = TextMain,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.SemiBold,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSecondaryContainer,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
                 textAlign = TextAlign.Center,
             )
         } else {
-            Text("+", color = Color(0xFF475569), fontSize = 18.sp)
+            Text(
+                "+",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
+            )
         }
     }
 }
@@ -322,10 +396,10 @@ fun BulkDialog(onDismiss: () -> Unit, onApply: (String, Boolean) -> Unit) {
             Column {
                 Text(
                     "Satu nama per baris, mengisi dari depan ke belakang.",
-                    color = Slate,
-                    fontSize = 12.sp,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(10.dp))
                 OutlinedTextField(
                     value = text,
                     onValueChange = { text = it },
@@ -333,13 +407,18 @@ fun BulkDialog(onDismiss: () -> Unit, onApply: (String, Boolean) -> Unit) {
                     minLines = 5,
                     modifier = Modifier.fillMaxWidth(),
                 )
-                Spacer(Modifier.height(8.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    RadioButton(selected = !gantiSemua, onClick = { gantiSemua = false })
-                    Text("Isi kosong saja", color = TextMain, fontSize = 13.sp)
-                    Spacer(Modifier.width(12.dp))
-                    RadioButton(selected = gantiSemua, onClick = { gantiSemua = true })
-                    Text("Ganti semua", color = TextMain, fontSize = 13.sp)
+                Spacer(Modifier.height(12.dp))
+                SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+                    SegmentedButton(
+                        selected = !gantiSemua,
+                        onClick = { gantiSemua = false },
+                        shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
+                    ) { Text("Isi kosong saja", maxLines = 1) }
+                    SegmentedButton(
+                        selected = gantiSemua,
+                        onClick = { gantiSemua = true },
+                        shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
+                    ) { Text("Ganti semua", maxLines = 1) }
                 }
             }
         },
@@ -347,12 +426,7 @@ fun BulkDialog(onDismiss: () -> Unit, onApply: (String, Boolean) -> Unit) {
             Button(onClick = { onApply(text, gantiSemua) }) { Text("Terapkan") }
         },
         dismissButton = {
-            Button(onClick = onDismiss, colors = ButtonDefaults.buttonColors(containerColor = Card)) {
-                Text("Batal")
-            }
+            TextButton(onClick = onDismiss) { Text("Batal") }
         },
-        containerColor = Card,
-        textContentColor = TextMain,
-        titleContentColor = TextMain,
     )
 }

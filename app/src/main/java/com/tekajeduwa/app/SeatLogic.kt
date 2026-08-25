@@ -46,7 +46,7 @@ private fun nearestFree(
     return best ?: (targetCol to targetDepth)
 }
 
-fun rollSeats(prev: Seats): Seats {
+fun rollSeats(prev: Seats, flipArah: Boolean): Seats {
     val occupied = mutableSetOf<Pair<Int, Int>>()
     val placed = emptySeats().map { it.toMutableList() }
 
@@ -61,8 +61,11 @@ fun rollSeats(prev: Seats): Seats {
     }.sortedWith(compareBy({ it.d }, { it.c }))
 
     for (m in movers) {
-        // barisan ganjil nyerong kanan, genap nyerong kiri
-        val arah = if ((m.c + 1) % 2 == 1) 1 else -1
+        // dasar: barisan ganjil nyerong kanan, genap nyerong kiri.
+        // tiap periode arahnya dibalik biar semua siswa ngelilingi
+        // seluruh kelas, bukan cuma muter di dua barisan.
+        val kanan = ((m.c + 1) % 2 == 1) xor flipArah
+        val arah = if (kanan) 1 else -1
         val t = (m.c + arah).coerceIn(0, COLUMN_SIZES.lastIndex)
         // paling depan pindah ke paling belakang, lainnya maju satu meja
         var nd = if (m.d == 0) COLUMN_SIZES[t] - 1 else m.d - 1
